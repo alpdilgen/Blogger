@@ -1,10 +1,9 @@
 
 import streamlit as st
-import openai
+from openai import OpenAI
 
 # === CONFIGURATION ===
-openai.api_key = st.secrets["OPENAI_API_KEY"]  # Store in Streamlit secrets
-
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 FINE_TUNED_MODEL = "ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW"
 
 # === SESSION STATE ===
@@ -35,23 +34,22 @@ if st.session_state.questions_asked and not st.session_state.show_blog:
     if all(st.session_state.user_answers.values()):
         if st.button("Generate Blog Post"):
             # Construct the final prompt
-            full_prompt = f"""
-Please write a blog post based on the following details:
+            full_prompt = f"""Please write a blog post based on the following details:
 - Topic: {st.session_state.user_request}
 - Audience: {st.session_state.user_answers['audience']}
 - Tone: {st.session_state.user_answers['tone']}
 - Features to include: {st.session_state.user_answers['features']}
-""".strip()
+"""
 
             with st.spinner("Writing your blog post..."):
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model=FINE_TUNED_MODEL,
                     messages=[
                         {"role": "system", "content": "You are a travel and hospitality blogger assistant."},
-                        {"role": "user", "content": full_prompt}
+                        {"role": "user", "content": full_prompt.strip()}
                     ]
                 )
-                blog_output = response["choices"][0]["message"]["content"]
+                blog_output = response.choices[0].message.content
                 st.session_state.blog_output = blog_output
                 st.session_state.show_blog = True
 

@@ -57,7 +57,7 @@ if st.session_state.step < len(QUESTIONS):
     if response:
         st.session_state.answers[question_key] = response
         st.session_state.step += 1
-        st.experimental_rerun()
+        st.rerun()
 else:
     if not st.session_state.show_blog:
         if st.button("✍️ Generate Blog Post"):
@@ -85,4 +85,4 @@ if st.session_state.show_blog:
         st.session_state.step = 0
         st.session_state.answers = {}
         st.session_state.show_blog = False
-        st.experimental_rerun()
+        st.rerun()

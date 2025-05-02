@@ -1,11 +1,11 @@
 import streamlit as st
 from openai import OpenAI
 
-# === CONFIGURATION ===
+# === CONFIG ===
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-FINE_TUNED_MODEL = "ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW"
+MODEL = "ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW"
 
-# === DEFINE QUESTION FLOW WITH MULTIPLE CHOICE OPTIONS ===
+# === QUESTIONS ===
 QUESTIONS = [
     {
         "key": "topic",
@@ -69,85 +69,87 @@ QUESTIONS = [
     }
 ]
 
-# === BLOG STYLE SAMPLE POST ===
-EXAMPLE_POST = """
+# === EXAMPLE POST ===
+EXAMPLE = """
 🧭 **Title:** Discovering the Soul of Tbilisi: A Hidden Gem in the Caucasus
 
-✈️ **Intro:** Tbilisi, Georgia's quirky and colorful capital, blends Eastern charm with bohemian energy. Nestled between hills and the Mtkvari River, this city enchants travelers...
+✈️ **Intro:** Tbilisi, Georgia's quirky and colorful capital, blends Eastern charm with bohemian energy...
 
-🏛️ **1. Cultural Echoes**
+🏛️ **1. Cultural Echoes & Landmarks**
 🍷 **2. Culinary Magic**
-🧵 **3. Hidden Treasures**
-🎒 **Conclusion**
-🔎 **Meta Summary:** keywords, extract, tweet, image prompt
+🧵 **3. Hidden Treasures & Hipster Havens**
+
+🎒 **Conclusion:** Tbilisi is not just a destination – it’s a mood.
+
+🔎 **Meta Summary:**
+- **Keywords:** Tbilisi, Georgia travel, hidden gems
+- **Extract:** A story-driven destination guide
+- **Tweet:** “Tbilisi, you’ve got my heart 💛 #TravelGeorgia”
+- **Image Prompt:** Street cafes, balconies, boho vibes
 """
 
 # === INSTRUCTIONS ===
 INSTRUCTIONS = (
-    "You are a travel blog writer creating structured, engaging, beautifully formatted content.\\n"
-    "Use markdown headers, emojis, subheadings, and clear sections:\\n"
-    "- Title (with emoji)\\n"
-    "- Intro paragraph\\n"
-    "- 3 body sections with emoji headings\\n"
-    "- Conclusion\\n"
-    "- Metadata block: keywords, extract, tweet, image prompt\\n"
-    "⚠️ Important: Only include the destination specified. Do not reference unrelated cities or countries.\\n"
-    "✅ Validate the destination in the title matches the brief.\\n"
-    "Output should be around 700–750 words. Match the clarity and format of the example provided."
+    "You are a professional travel blogger. Respond ONLY with a complete blog post using this exact format:\\n"
+    "- Emoji title\\n"
+    "- ✈️ Intro paragraph\\n"
+    "- Three structured sections with emoji subheadings\\n"
+    "- 🎒 Conclusion\\n"
+    "- 🔎 Meta summary block with: keywords, extract, tweet, image prompt\\n"
+    "⚠️ Do NOT reference unrelated places or mix in irrelevant facts.\\n"
+    "✅ Validate the city matches the topic. Output ~700–750 words. Match tone, format, and structure of the example provided."
 )
 
-# === SESSION STATE ===
+# === STATE INIT ===
 if "step" not in st.session_state:
     st.session_state.step = 0
     st.session_state.answers = {}
-    st.session_state.show_blog = False
+    st.session_state.blog = None
 
-# === STREAMLIT UI ===
-st.title("📝 Hospitality Blog Generator")
-st.markdown("Let’s create a stunning travel blog post. I’ll ask a few quick questions:")
+# === TITLE ===
+st.title("✍️ Hospitality Blog Creator")
+st.markdown("Let’s build your perfect blog post. Answer the following:")
 
-# === DISPLAY QUESTIONS ===
+# === QUESTION LOOP ===
 if st.session_state.step < len(QUESTIONS):
-    current = QUESTIONS[st.session_state.step]
-    st.subheader(current["text"])
-
-    if current["choices"]:
-        for choice in current["choices"]:
-            st.markdown(f"- {choice}")
-        response = st.text_input("Select number(s) or type your own answer:")
-    else:
-        response = st.text_input("Type your answer:")
-
-    if response:
-        st.session_state.answers[current["key"]] = response.strip()
-        st.session_state.step += 1
-        st.rerun()
+    q = QUESTIONS[st.session_state.step]
+    with st.form(f"form_{q['key']}"):
+        st.subheader(q["text"])
+        if q["choices"]:
+            for choice in q["choices"]:
+                st.markdown(f"- {choice}")
+            response = st.text_input("Select number(s) or type your own answer:")
+        else:
+            response = st.text_input("Type your answer:")
+        submitted = st.form_submit_button("Next")
+        if submitted and response.strip():
+            st.session_state.answers[q["key"]] = response.strip()
+            st.session_state.step += 1
+            st.rerun()
 
 # === GENERATE BLOG ===
-elif not st.session_state.show_blog:
+elif not st.session_state.blog:
     if st.button("🪄 Generate Blog Post"):
         summary = "\\n".join([f"{k.capitalize()}: {v}" for k, v in st.session_state.answers.items()])
-        prompt = f"{INSTRUCTIONS}\\n\\nHere is a sample blog:\\n{EXAMPLE_POST}\\n\\nNow write a new blog post using the following brief:\\n{summary}"
-
-        with st.spinner("Creating your location-accurate blog..."):
-            response = client.chat.completions.create(
-                model=FINE_TUNED_MODEL,
+        prompt = f"{INSTRUCTIONS}\\n\\nHere’s a sample blog:\\n{EXAMPLE}\\n\\nNow write a new blog using this brief:\\n{summary}"
+        with st.spinner("Creating your blog..."):
+            result = client.chat.completions.create(
+                model=MODEL,
                 max_tokens=800,
                 messages=[
                     {"role": "system", "content": "You are a precise, engaging travel blogger."},
                     {"role": "user", "content": prompt}
                 ]
             )
-            st.session_state.blog_output = response.choices[0].message.content
-            st.session_state.show_blog = True
+            st.session_state.blog = result.choices[0].message.content
 
-# === DISPLAY BLOG POST ===
-if st.session_state.show_blog:
+# === OUTPUT ===
+if st.session_state.blog:
     st.subheader("📄 Your Blog Post")
-    st.markdown(st.session_state.blog_output)
+    st.markdown(st.session_state.blog)
 
     if st.button("🔁 Start Over"):
         st.session_state.step = 0
         st.session_state.answers = {}
-        st.session_state.show_blog = False
+        st.session_state.blog = None
         st.rerun()

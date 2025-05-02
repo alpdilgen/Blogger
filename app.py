@@ -69,48 +69,17 @@ QUESTIONS = [
     }
 ]
 
-# === EXAMPLE POST ===
-EXAMPLE = """
-🧭 **Title:** Discovering the Soul of Tbilisi: A Hidden Gem in the Caucasus
-
-✈️ **Intro:** Tbilisi, Georgia's quirky and colorful capital, blends Eastern charm with bohemian energy...
-
-🏛️ **1. Cultural Echoes & Landmarks**
-🍷 **2. Culinary Magic**
-🧵 **3. Hidden Treasures & Hipster Havens**
-
-🎒 **Conclusion:** Tbilisi is not just a destination – it’s a mood.
-
-🔎 **Meta Summary:**
-- **Keywords:** Tbilisi, Georgia travel, hidden gems
-- **Extract:** A story-driven destination guide
-- **Tweet:** “Tbilisi, you’ve got my heart 💛 #TravelGeorgia”
-- **Image Prompt:** Street cafes, balconies, boho vibes
-"""
-
-# === INSTRUCTIONS ===
-INSTRUCTIONS = (
-    "You are a professional travel blogger. Respond ONLY with a complete blog post using this exact format:\\n"
-    "- Emoji title\\n"
-    "- ✈️ Intro paragraph\\n"
-    "- Three structured sections with emoji subheadings\\n"
-    "- 🎒 Conclusion\\n"
-    "- 🔎 Meta summary block with: keywords, extract, tweet, image prompt\\n"
-    "⚠️ Do NOT reference unrelated places or mix in irrelevant facts.\\n"
-    "✅ Validate the city matches the topic. Output ~700–750 words. Match tone, format, and structure of the example provided."
-)
-
-# === STATE INIT ===
+# === INIT STATE ===
 if "step" not in st.session_state:
     st.session_state.step = 0
     st.session_state.answers = {}
     st.session_state.blog = None
 
-# === TITLE ===
+# === APP TITLE ===
 st.title("✍️ Hospitality Blog Creator")
 st.markdown("Let’s build your perfect blog post. Answer the following:")
 
-# === QUESTION LOOP ===
+# === QUESTION FLOW ===
 if st.session_state.step < len(QUESTIONS):
     q = QUESTIONS[st.session_state.step]
     with st.form(f"form_{q['key']}"):
@@ -118,7 +87,7 @@ if st.session_state.step < len(QUESTIONS):
         if q["choices"]:
             for choice in q["choices"]:
                 st.markdown(f"- {choice}")
-            response = st.text_input("Select number(s) or type your own answer:")
+            response = st.text_input("Select number(s) or type your answer:")
         else:
             response = st.text_input("Type your answer:")
         submitted = st.form_submit_button("Next")
@@ -127,23 +96,46 @@ if st.session_state.step < len(QUESTIONS):
             st.session_state.step += 1
             st.rerun()
 
-# === GENERATE BLOG ===
+# === BLOG GENERATION ===
 elif not st.session_state.blog:
     if st.button("🪄 Generate Blog Post"):
-        summary = "\\n".join([f"{k.capitalize()}: {v}" for k, v in st.session_state.answers.items()])
-        prompt = f"{INSTRUCTIONS}\\n\\nHere’s a sample blog:\\n{EXAMPLE}\\n\\nNow write a new blog using this brief:\\n{summary}"
-        with st.spinner("Creating your blog..."):
+        summary = "\n".join([f"{k.replace('_',' ').capitalize()}: {v}" for k, v in st.session_state.answers.items()])
+        
+        full_prompt = f"""
+You are a professional travel blogger trained to write elegant, highly readable, structured blog posts.
+
+💡 FORMAT REQUIREMENTS:
+- Start with a **catchy emoji title**
+- Include a ✈️ **intro paragraph** (tone: engaging, polished, magazine-style)
+- Write 3 structured sections with emoji subheadings (e.g., 🏛️, 🍷, 🧵)
+- End with a 🎒 **Conclusion** that emotionally wraps up the post
+- Then add a 🔎 **Meta Summary** block with:
+  - **Keywords:** (SEO tags)
+  - **Extract:** (1–2 sentence description)
+  - **Tweet:** (clever, short quote)
+  - **Instagram Tags:** (#hashtags for IG/FB)
+  - **Image Prompt:** (what kind of image pairs well with the post)
+
+📌 Use storytelling flow, vivid sensory detail, and accurate travel insights. Do NOT drift off-topic. Write in English. Keep focus on the destination: {st.session_state.answers.get('topic', '')}.
+Make sure the post includes a proper ending and summary.
+
+📝 WRITING BRIEF:
+{summary}
+"""
+
+        with st.spinner("✍️ Writing your blog..."):
             result = client.chat.completions.create(
                 model=MODEL,
-                max_tokens=800,
+                max_tokens=3000,
+                temperature=0.8,
                 messages=[
-                    {"role": "system", "content": "You are a precise, engaging travel blogger."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": "You are a travel blogger specialized in stylish, helpful content."},
+                    {"role": "user", "content": full_prompt}
                 ]
             )
             st.session_state.blog = result.choices[0].message.content
 
-# === OUTPUT ===
+# === BLOG OUTPUT ===
 if st.session_state.blog:
     st.subheader("📄 Your Blog Post")
     st.markdown(st.session_state.blog)

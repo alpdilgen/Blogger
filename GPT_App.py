@@ -1,15 +1,15 @@
 import streamlit as st
 from openai import OpenAI
 
-# Load API key from Streamlit secrets
+# Load API key securely
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Instruction set (optional, but helpful)
+# System-level prompt for tone and behavior
 SYSTEM_PROMPT = """
 You are a professional yet casual travel and hospitality blog writer. Write structured, informative, visually engaging blog posts. Use a warm tone, section headings, emojis, real tips, and local flavor. Finish with a metadata block (summary, keywords, tags, social snippet).
 """
 
-# Define all questions in order
+# Blog brief questions
 questions = [
     {"key": "destination", "prompt": "📍 What destination, hotel, or travel experience is the blog post about?"},
     {"key": "purpose", "prompt": "🎯 What is the main purpose?\n1️⃣ Attract tourists\n2️⃣ Promote bookings\n3️⃣ Boost SEO\n4️⃣ Educate travelers"},
@@ -31,11 +31,11 @@ if "step" not in st.session_state:
 if "answers" not in st.session_state:
     st.session_state.answers = {}
 
-# Page setup
+# Page config
 st.set_page_config(page_title="GPT Travel Blog Assistant", layout="centered")
 st.title("🧳 GPT Travel Blog Assistant")
 
-# Process steps
+# Question display and input
 if st.session_state.step < len(questions):
     q = questions[st.session_state.step]
     st.subheader(f"Question {st.session_state.step + 1} of {len(questions)}")
@@ -48,22 +48,21 @@ if st.session_state.step < len(questions):
     if response and next_btn:
         st.session_state.answers[q["key"]] = response
         st.session_state.step += 1
-        st.experimental_rerun()
+        st.rerun()  # ✅ Updated line
 
 elif st.session_state.step == len(questions):
     st.success("✅ All questions answered. Generating your blog post...")
     with st.spinner("Crafting your tailored blog post..."):
 
-        # Build user message
-        user_prompt = "Based on the following details, write a travel blog post:\n\n"
+        # Build prompt string
+        user_prompt = "Please write a travel blog post based on the following brief:\n\n"
         for q in questions:
-            key = q["key"]
-            val = st.session_state.answers.get(key, "N/A")
-            user_prompt += f"- {q['prompt'].split('?')[0]}: {val}\n"
+            answer = st.session_state.answers.get(q["key"], "N/A")
+            user_prompt += f"- {q['prompt'].split('?')[0]}: {answer}\n"
 
-        # Call OpenAI with new SDK
+        # OpenAI call
         completion = client.chat.completions.create(
-            model="ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW",  # <-- Your fine-tuned model
+            model="ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
@@ -76,7 +75,7 @@ elif st.session_state.step == len(questions):
         st.markdown("---")
         st.subheader("📄 Your Blog Post")
         st.markdown(blog)
-        st.session_state.step += 1  # prevent rerun
+        st.session_state.step += 1
 
 else:
-    st.info("🔁 Refresh to start a new blog post.")
+    st.info("🔁 Refresh the page to start over or generate a new post.")

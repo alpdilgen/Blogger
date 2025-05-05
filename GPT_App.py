@@ -1,143 +1,82 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 
-# Load OpenAI key from secrets
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Load API key from Streamlit secrets
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-st.set_page_config(page_title="Hospitality Blog Assistant", layout="wide")
+# Instruction set (optional, but helpful)
+SYSTEM_PROMPT = """
+You are a professional yet casual travel and hospitality blog writer. Write structured, informative, visually engaging blog posts. Use a warm tone, section headings, emojis, real tips, and local flavor. Finish with a metadata block (summary, keywords, tags, social snippet).
+"""
 
-st.title("✍️ Hospitality Blog Assistant")
-st.markdown("Ask me to write a blog post — I’ll ask a few quick questions to make it perfect.")
+# Define all questions in order
+questions = [
+    {"key": "destination", "prompt": "📍 What destination, hotel, or travel experience is the blog post about?"},
+    {"key": "purpose", "prompt": "🎯 What is the main purpose?\n1️⃣ Attract tourists\n2️⃣ Promote bookings\n3️⃣ Boost SEO\n4️⃣ Educate travelers"},
+    {"key": "audience", "prompt": "👥 Who is the target audience?\n1️⃣ Families\n2️⃣ Couples\n3️⃣ Solo travelers\n4️⃣ Digital nomads\n5️⃣ Wellness seekers"},
+    {"key": "tone", "prompt": "🎨 Preferred tone & style?\n1️⃣ Friendly\n2️⃣ Elegant\n3️⃣ Professional\n4️⃣ Storytelling\n5️⃣ Travel magazine-style"},
+    {"key": "content", "prompt": "📋 What should be included?\n1️⃣ Hotel overview\n2️⃣ SPA experience\n3️⃣ Local attractions\n4️⃣ Dining\n5️⃣ Tips & culture"},
+    {"key": "usps", "prompt": "🌟 Any unique features to highlight?\n1️⃣ Mineral springs\n2️⃣ Sustainability\n3️⃣ Local heritage\n4️⃣ Luxury amenities"},
+    {"key": "links", "prompt": "🔗 Any reference or website to include?"},
+    {"key": "seasonal", "prompt": "🗓️ Is the post seasonal?\n1️⃣ Spring\n2️⃣ Summer\n3️⃣ Autumn\n4️⃣ Winter\n5️⃣ Year-round"},
+    {"key": "structure", "prompt": "✍️ Preferred structure?\n1️⃣ 800–1000 words\n2️⃣ Storytelling\n3️⃣ Top-10 list\n4️⃣ Itinerary style"},
+    {"key": "platform", "prompt": "📢 Where will it be published?\n1️⃣ Blog\n2️⃣ Social media\n3️⃣ Newsletter\n4️⃣ Booking site"},
+    {"key": "notes", "prompt": "📝 Any keywords, metadata, or social formats (e.g. Instagram, LinkedIn) to include?"},
+    {"key": "language", "prompt": "🌍 Preferred language?\n1️⃣ English\n2️⃣ Turkish\n3️⃣ German\n4️⃣ French"},
+]
 
 # Initialize session state
 if "step" not in st.session_state:
     st.session_state.step = 0
+if "answers" not in st.session_state:
     st.session_state.answers = {}
 
-# Questions for the user
-questions = [
-    {
-        "key": "topic",
-        "question": "📍 What destination, hotel, or travel experience is the blog post about?",
-        "type": "text"
-    },
-    {
-        "key": "purpose",
-        "question": "🎯 What is the main purpose of the blog post?",
-        "options": ["1️⃣ Attract tourists", "2️⃣ Promote bookings", "3️⃣ Boost SEO", "4️⃣ Educate travelers"]
-    },
-    {
-        "key": "audience",
-        "question": "👥 Who is the target audience?",
-        "options": ["1️⃣ Families", "2️⃣ Couples", "3️⃣ Solo travelers", "4️⃣ Digital nomads", "5️⃣ Wellness seekers"]
-    },
-    {
-        "key": "tone",
-        "question": "🎨 What tone and style do you prefer?",
-        "options": ["1️⃣ Friendly", "2️⃣ Elegant", "3️⃣ Professional", "4️⃣ Storytelling", "5️⃣ Travel magazine-style"]
-    },
-    {
-        "key": "content",
-        "question": "📚 What kind of content should be included?",
-        "options": ["1️⃣ Hotel overview", "2️⃣ SPA experience", "3️⃣ Local attractions", "4️⃣ Dining", "5️⃣ Tips & culture"],
-        "multi": True
-    },
-    {
-        "key": "usps",
-        "question": "⭐ Any unique features or USPs to highlight?",
-        "options": ["1️⃣ Natural mineral springs", "2️⃣ Sustainability", "3️⃣ Local heritage", "4️⃣ Luxury amenities"],
-        "multi": True
-    },
-    {
-        "key": "reference",
-        "question": "🔗 Do you want me to reference or link to any website or platform?",
-        "type": "text"
-    },
-    {
-        "key": "season",
-        "question": "🗓️ Is this blog post seasonal or time-sensitive?",
-        "options": ["1️⃣ Spring", "2️⃣ Summer", "3️⃣ Autumn", "4️⃣ Winter", "5️⃣ Year-round"]
-    },
-    {
-        "key": "structure",
-        "question": "📝 Preferred word count or structure?",
-        "options": ["1️⃣ 800–1000 words", "2️⃣ Storytelling", "3️⃣ Top-10 list", "4️⃣ Itinerary style"]
-    },
-    {
-        "key": "channel",
-        "question": "📣 Where will this blog post be published or promoted?",
-        "options": ["1️⃣ Blog", "2️⃣ Social media", "3️⃣ Newsletter", "4️⃣ Booking site"]
-    },
-    {
-        "key": "notes",
-        "question": "🧾 Any extra notes, keywords, or brand guidelines I should follow?",
-        "type": "text"
-    },
-    {
-        "key": "language",
-        "question": "🌍 What is your preferred language for this blog?",
-        "options": ["1️⃣ English", "2️⃣ Turkish", "3️⃣ German", "4️⃣ French"]
-    }
-]
+# Page setup
+st.set_page_config(page_title="GPT Travel Blog Assistant", layout="centered")
+st.title("🧳 GPT Travel Blog Assistant")
 
-# Ask questions step-by-step
-q = questions[st.session_state.step]
-st.markdown(f"**{q['question']}**")
+# Process steps
+if st.session_state.step < len(questions):
+    q = questions[st.session_state.step]
+    st.subheader(f"Question {st.session_state.step + 1} of {len(questions)}")
+    response = st.text_input(q["prompt"], key=f"input_{st.session_state.step}")
 
-if "options" in q:
-    selected = st.multiselect("Choose one or more:" if q.get("multi") else "Choose one:", q["options"])
-    if st.button("Next"):
-        if selected:
-            st.session_state.answers[q["key"]] = selected
-            st.session_state.step += 1
-elif q.get("type") == "text":
-    response = st.text_input("Your answer")
-    if st.button("Next"):
-        if response:
-            st.session_state.answers[q["key"]] = response
-            st.session_state.step += 1
+    col1, col2 = st.columns([1, 3])
+    with col2:
+        next_btn = st.button("➡️ Next")
 
-# Generate blog post after final step
-if st.session_state.step >= len(questions):
-    with st.spinner("Writing your blog post..."):
-        system_prompt = "You are a professional yet engaging travel and hospitality blogger. Format output with clear headings, subheadings, emojis, and add metadata like keywords, summary, and hashtags for social media."
-        user_prompt = f"""Create a travel blog post with the following details:
+    if response and next_btn:
+        st.session_state.answers[q["key"]] = response
+        st.session_state.step += 1
+        st.experimental_rerun()
 
-Destination/Experience: {st.session_state.answers['topic']}
-Purpose: {st.session_state.answers['purpose']}
-Audience: {st.session_state.answers['audience']}
-Tone/Style: {st.session_state.answers['tone']}
-Content to include: {st.session_state.answers['content']}
-Unique Selling Points (USPs): {st.session_state.answers['usps']}
-Reference/Link: {st.session_state.answers['reference']}
-Season: {st.session_state.answers['season']}
-Structure: {st.session_state.answers['structure']}
-Channel: {st.session_state.answers['channel']}
-Extra notes: {st.session_state.answers['notes']}
-Language: {st.session_state.answers['language']}
+elif st.session_state.step == len(questions):
+    st.success("✅ All questions answered. Generating your blog post...")
+    with st.spinner("Crafting your tailored blog post..."):
 
-The blog should be engaging, well-formatted using markdown, and include:
-- A compelling title
-- A short intro paragraph
-- Multiple sections with emojis and informative subheadings
-- Meta data block at the end: keywords, summary, hashtags, tweet, LinkedIn snippet
-- Word count around 800–1000
-"""
+        # Build user message
+        user_prompt = "Based on the following details, write a travel blog post:\n\n"
+        for q in questions:
+            key = q["key"]
+            val = st.session_state.answers.get(key, "N/A")
+            user_prompt += f"- {q['prompt'].split('?')[0]}: {val}\n"
 
-        completion = openai.ChatCompletion.create(
-            model="ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW",
+        # Call OpenAI with new SDK
+        completion = client.chat.completions.create(
+            model="ft:gpt-3.5-turbo-0125:personal:blogger:BKfX4OnW",  # <-- Your fine-tuned model
             messages=[
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
             max_tokens=3000,
-            temperature=0.8
+            temperature=0.7
         )
 
         blog = completion.choices[0].message.content
-        st.markdown("## 🧳 Your Blog Post")
+        st.markdown("---")
+        st.subheader("📄 Your Blog Post")
         st.markdown(blog)
+        st.session_state.step += 1  # prevent rerun
 
-    if st.button("🔁 Start Over"):
-        st.session_state.step = 0
-        st.session_state.answers = {}
+else:
+    st.info("🔁 Refresh to start a new blog post.")
